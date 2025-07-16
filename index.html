@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>beep boop timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation; /* Prevents double-tap zoom on mobile */
+        }
+        /* Custom styles for better UI feel */
+        .timer-display {
+            font-weight: 900;
+            line-height: 1;
+        }
+        .btn {
+            transition: all 0.2s ease;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .panel {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .panel.hidden {
+            opacity: 0;
+            transform: scale(0.98);
+            pointer-events: none;
+            display: none; /* Keep for layout flow */
+        }
+        .preset-btn.saving {
+            background-color: #f59e0b; /* amber-500 */
+        }
+        .preset-btn.saving:hover {
+            background-color: #d97706; /* amber-600 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        <!-- Main Timer View -->
+        <div id="timer-container" class="bg-gray-800 rounded-2xl shadow-2xl p-6 relative panel">
+            <!-- Timer Display -->
+            <div id="display-area" class="text-center mb-4 relative h-64 flex flex-col items-center justify-center bg-gray-900 rounded-xl">
+                <div id="timer-display-content" class="z-0">
+                    <div id="phase-display" class="text-2xl font-bold uppercase text-yellow-400 mb-2">Prepare</div>
+                    <div id="timer-display" class="text-8xl md:text-9xl timer-display text-green-400">00:00</div>
+                    <div id="progress-display" class="text-xl text-gray-400 mt-2">
+                        Round <span id="current-round">0</span>/<span id="total-rounds">10</span> |
+                        Set <span id="current-set">0</span>/<span id="total-sets">5</span>
+                    </div>
+                </div>
+                <div id="completion-message" class="z-10 hidden">
+                    <h2 class="text-4xl md:text-5xl font-extrabold text-green-400">Workout Completed!</h2>
+                </div>
+            </div>
+            
+            <!-- Exercise Display -->
+            <div id="exercise-display-container" class="text-center mb-4 p-3 bg-gray-700 rounded-lg">
+                <h4 class="text-sm font-semibold text-gray-400 uppercase">Current Exercise</h4>
+                <p id="exercise-display" class="text-xl font-bold text-white truncate">---</p>
+            </div>
+
+            <!-- Controls -->
+            <div id="controls-container" class="grid grid-cols-3 gap-4">
+                <button id="start-pause-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg text-lg btn">Start</button>
+                <button id="reset-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg text-lg btn">Reset</button>
+                <button id="settings-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-lg btn">Settings</button>
+            </div>
+        </div>
+
+        <!-- Settings Panel (Initially Hidden) -->
+        <div id="settings-panel" class="bg-gray-800 rounded-2xl shadow-2xl p-6 hidden panel">
+            <h3 class="text-2xl font-bold mb-6 text-center">Settings</h3>
+            
+            <!-- Timer Settings -->
+            <div id="timer-inputs-container" class="grid grid-cols-2 gap-x-6 gap-y-4 mb-6">
+                <!-- Timer inputs will be dynamically generated here -->
+            </div>
+
+            <!-- Calculated Durations -->
+            <div class="bg-gray-700 p-4 rounded-lg text-center grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-400 uppercase">Set Duration</h4>
+                    <p id="set-duration-display" class="text-2xl font-bold">00:00</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-400 uppercase">Total Workout</h4>
+                    <p id="total-duration-display" class="text-2xl font-bold">00:00</p>
+                </div>
+            </div>
+
+            <!-- Presets -->
+            <div class="mb-4">
+                <h4 id="preset-heading" class="text-center text-gray-400 font-semibold uppercase text-sm mb-2">Presets</h4>
+                <div id="preset-buttons-container" class="grid grid-cols-3 gap-2">
+                    <!-- Preset buttons will be dynamically generated here -->
+                </div>
+            </div>
+            
+            <button id="save-preset-mode-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-3 rounded-lg text-base btn mb-4">Save as Preset</button>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <button id="exercise-settings-btn" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg text-lg btn">Exercises</button>
+                <button id="close-settings-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-lg btn col-span-1">Done</button>
+            </div>
+        </div>
+        
+        <!-- Exercise Settings Panel (Initially Hidden) -->
+        <div id="exercise-settings-panel" class="bg-gray-800 rounded-2xl shadow-2xl p-6 hidden panel">
+            <h3 class="text-2xl font-bold mb-6 text-center">Exercise List</h3>
+            <div id="exercise-inputs-container" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                <!-- Exercise inputs will be dynamically generated here -->
+            </div>
+            <button id="back-to-settings-btn-from-exercises" class="mt-6 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-lg btn">Back</button>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM ELEMENT REFERENCES ---
+    const getElem = (id) => document.getElementById(id);
+    const elements = {
+        timerContainer: getElem('timer-container'),
+        settingsPanel: getElem('settings-panel'),
+        exerciseSettingsPanel: getElem('exercise-settings-panel'),
+        timerDisplayContent: getElem('timer-display-content'),
+        completionMessage: getElem('completion-message'),
+        currentRoundDisplay: getElem('current-round'),
+        totalRoundsDisplay: getElem('total-rounds'),
+        currentSetDisplay: getElem('current-set'),
+        totalSetsDisplay: getElem('total-sets'),
+        exerciseDisplay: getElem('exercise-display'),
+        timerDisplay: getElem('timer-display'),
+        phaseDisplay: getElem('phase-display'),
+        controlsContainer: getElem('controls-container'),
+        startPauseBtn: getElem('start-pause-btn'),
+        resetBtn: getElem('reset-btn'),
+        settingsBtn: getElem('settings-btn'),
+        closeSettingsBtn: getElem('close-settings-btn'),
+        exerciseSettingsBtn: getElem('exercise-settings-btn'),
+        backToSettingsBtnFromExercises: getElem('back-to-settings-btn-from-exercises'),
+        setDurationDisplay: getElem('set-duration-display'),
+        totalDurationDisplay: getElem('total-duration-display'),
+        timerInputsContainer: getElem('timer-inputs-container'),
+        presetHeading: getElem('preset-heading'),
+        savePresetModeBtn: getElem('save-preset-mode-btn'),
+        presetButtonsContainer: getElem('preset-buttons-container'),
+        exerciseInputsContainer: getElem('exercise-inputs-container'),
+    };
+
+    // --- STATE MANAGEMENT ---
+    let state = {}; // Will be populated by loadState
+    let isSavingPreset = false;
+
+    // --- AUDIO FILE MAPPING ---
+    const soundFiles = {
+        work: 'sound/work.mp3',
+        rest: 'sound/rest.mp3',
+        countdown: 'sound/countdown.mp3',
+        setEnd: 'sound/set_end.mp3',
+        finish: 'sound/finish.mp3'
+    };
+
+    const defaultState = {
+        timer: null,
+        status: 'idle', // 'idle', 'running', 'paused'
+        phase: 'prepare', // 'prepare', 'work', 'rest', 'setRest', 'complete'
+        currentTime: 0,
+        currentRound: 0,
+        currentSet: 0,
+        settings: {
+            workTime: 30,
+            restTime: 30,
+            roundsPerSet: 3,
+            numSets: 6,
+            restBetweenSets: 30,
+            preStartDelay: 3,
+            exercises: ["High Knees", "Jumping jacks", "Side bends", "Good mornings", "Skater hops", "Squats"]
+        },
+        // This maps a phase to a sound type from the soundFiles object
+        sounds: {
+            preStart: 'countdown',
+            workStart: 'work',
+            restStart: 'rest',
+            setEnd: 'setEnd',
+            workoutComplete: 'finish'
+        },
+        presets: {
+            "Main": { workTime: 35, restTime: 35, roundsPerSet: 8, numSets: 4, restBetweenSets: 40, exercises: ["Landmine row", "Landmine press", "Landmine squat", "Kettlebell swings"] },
+            "More": { workTime: 32, restTime: 32, roundsPerSet: 3, numSets: 12, restBetweenSets: 0, exercises: ["Woodchoppers", "Bowman", "Shoulder 360s", "Face pulls", "Good mornings", "Reverse hyper", "Split squats", "Glute Circuit", "Hip flexor march", "Hamstring slides", "Push/Pull", "Neck/Forearms"] },
+            "Thasmin": { workTime: 35, restTime: 35, roundsPerSet: 4, numSets: 7, restBetweenSets: 75, exercises: ["Kettlebell power cleans", "kettlebell swings", "split squat", "squat", "Hip thrust", "monster walk", "banded row"] },
+            "1st": { workTime: 35, restTime: 35, roundsPerSet: 8, numSets: 4, restBetweenSets: 40, exercises: ["Barbell power cleans", "Barbell row", "Zercher squat", "Hip thrust"] },
+            "2nd": { workTime: 32, restTime: 32, roundsPerSet: 3, numSets: 12, restBetweenSets: 0, exercises: ["Pull ups", "Push ups", "Pallof press", "Jefferson curls", "Back extension", "Suitcase carry", "Shoulder carry", "Monster walks", "3 Glutes", "Neck & forearms", "4-Plank", "YTWL"] },
+            "Cardio": { 
+                workTime: 30, 
+                restTime: 15, 
+                roundsPerSet: 10, 
+                numSets: 5, 
+                restBetweenSets: 75, 
+                exercises: ["High Knees", "Burpees", "Jumping Jacks", "Mountain Climbers", "Jump Rope", "Tuck Jumps", "Skater Jumps", "Box Jumps", "Lunge Jumps", "Sprints"] 
+            }
+        }
+    };
+    
+    // --- DATA PERSISTENCE ---
+    const saveState = () => {
+        try {
+            // Only save settings and presets, sounds are now fixed.
+            const stateToSave = {
+                settings: state.settings,
+                presets: state.presets,
+            };
+            localStorage.setItem('tabataTimerState', JSON.stringify(stateToSave));
+        } catch (e) {
+            console.error("Could not save state to localStorage", e);
+        }
+    };
+
+    const loadState = () => {
+        try {
+            const savedStateJSON = localStorage.getItem('tabataTimerState');
+            // Always start with a deep copy of the default state.
+            state = JSON.parse(JSON.stringify(defaultState));
+
+            if (savedStateJSON) {
+                const savedState = JSON.parse(savedStateJSON);
+                
+                // Overwrite default settings with saved ones, if they exist
+                if (savedState.settings) {
+                    state.settings = { ...state.settings, ...savedState.settings };
+                }
+                
+                // Overwrite default presets with saved ones, if they exist
+                if (savedState.presets) {
+                    state.presets = savedState.presets;
+                }
+            }
+        } catch (e) {
+            console.error("Could not load state from localStorage, resetting to default.", e);
+            // If anything fails, reset to a clean default state.
+            state = JSON.parse(JSON.stringify(defaultState));
+        }
+    };
+    
+    // --- DYNAMIC UI GENERATION ---
+    const createStepperInput = (id, label, value, isFullWidth = false) => {
+        const container = document.createElement('div');
+        container.className = `form-group ${isFullWidth ? 'col-span-2' : ''}`;
+        const labelClass = 'block text-sm font-bold text-gray-300 text-center';
+        container.innerHTML = `
+            <label for="${id}" class="${labelClass}">${label}</label>
+            <div class="flex items-center gap-2 mt-1">
+                <button data-action="decrement" data-target="${id}" class="stepper-btn w-10 h-10 text-xl font-bold bg-gray-700 hover:bg-gray-600 rounded-md btn">-</button>
+                <input type="number" id="${id}" value="${value}" class="timer-setting-input text-center block w-full bg-gray-900 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                <button data-action="increment" data-target="${id}" class="stepper-btn w-10 h-10 text-xl font-bold bg-gray-700 hover:bg-gray-600 rounded-md btn">+</button>
+            </div>
+        `;
+        return container;
+    };
+
+    const generateTimerInputs = () => {
+        const container = elements.timerInputsContainer;
+        container.innerHTML = '';
+        const s = state.settings;
+        container.appendChild(createStepperInput('work-time', 'Work', s.workTime));
+        container.appendChild(createStepperInput('rest-time', 'Rest', s.restTime));
+        container.appendChild(createStepperInput('rounds-per-set', 'Rounds', s.roundsPerSet));
+        container.appendChild(createStepperInput('num-sets', 'Sets', s.numSets));
+        container.appendChild(createStepperInput('rest-between-sets', 'Rest Between Sets', s.restBetweenSets, true));
+    };
+    
+    const generatePresetButtons = () => {
+        const container = elements.presetButtonsContainer;
+        container.innerHTML = '';
+        Object.keys(state.presets).forEach(name => {
+            const button = document.createElement('button');
+            button.dataset.presetName = name;
+            button.className = 'preset-btn bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-3 rounded-lg text-base btn truncate';
+            button.textContent = name;
+            button.addEventListener('click', () => {
+                if (isSavingPreset) {
+                    savePreset(name);
+                } else {
+                    applyPreset(name);
+                }
+            });
+            container.appendChild(button);
+        });
+    };
+
+    const generateExerciseInputs = () => {
+        const container = elements.exerciseInputsContainer;
+        container.innerHTML = '';
+        const numSets = state.settings.numSets;
+        // Ensure exercises array is the correct length
+        adjustExerciseArray(numSets); 
+        for (let i = 0; i < numSets; i++) {
+            const exerciseName = state.settings.exercises[i] || '';
+            const inputGroup = document.createElement('div');
+            inputGroup.innerHTML = `
+                <label for="exercise-set-${i+1}" class="block text-sm font-medium text-gray-400">Set ${i+1}</label>
+                <input type="text" id="exercise-set-${i+1}" data-set-index="${i}" value="${exerciseName}" class="exercise-input mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            `;
+            container.appendChild(inputGroup);
+        }
+    };
+
+    // --- CORE TIMER FUNCTIONS ---
+    const playSound = (soundType) => {
+        const path = soundFiles[soundType];
+        if (!path) return; // Don't play if no path is defined
+
+        const audio = new Audio(path);
+        audio.play().catch(e => console.error("Error playing sound:", e)); // Add error handling
+    };
+    
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const secs = (seconds % 60).toString().padStart(2, '0');
+        return `${mins}:${secs}`;
+    };
+
+    const tick = () => {
+        state.currentTime--;
+        updateDisplay();
+
+        if (state.currentTime > 0) {
+            if (state.phase === 'prepare' || (state.currentTime <= 3 && state.currentTime > 0)) {
+                if(state.phase !== 'work' && state.phase !== 'rest') playSound(state.sounds.preStart);
+            }
+            return;
+        }
+
+        // --- State Transitions ---
+        if (state.phase === 'prepare') {
+            state.phase = 'work';
+            state.currentRound = 1;
+            state.currentSet = 1;
+            state.currentTime = state.settings.workTime;
+            playSound(state.sounds.workStart);
+        } else if (state.phase === 'work') {
+            if (state.currentRound >= state.settings.roundsPerSet && state.currentSet >= state.settings.numSets) {
+                workoutComplete();
+                return;
+            }
+            state.phase = 'rest';
+            state.currentTime = state.settings.restTime;
+            playSound(state.sounds.restStart);
+        } else if (state.phase === 'rest') {
+            if (state.currentRound >= state.settings.roundsPerSet) { // End of a set
+                 if (state.currentSet < state.settings.numSets && state.settings.restBetweenSets > 0) {
+                    state.phase = 'setRest';
+                    state.currentTime = state.settings.restBetweenSets;
+                    playSound(state.sounds.setEnd);
+                 } else { // No rest between sets, or last set, go to next set work
+                    state.currentSet++;
+                    state.currentRound = 1;
+                    state.phase = 'work';
+                    state.currentTime = state.settings.workTime;
+                    playSound(state.sounds.workStart);
+                 }
+            } else { // Next round in the same set
+                state.currentRound++;
+                state.phase = 'work';
+                state.currentTime = state.settings.workTime;
+                playSound(state.sounds.workStart);
+            }
+        } else if (state.phase === 'setRest') {
+            state.currentSet++;
+            state.currentRound = 1;
+            state.phase = 'work';
+            state.currentTime = state.settings.workTime;
+            playSound(state.sounds.workStart);
+        }
+        updateDisplay();
+    };
+    
+    const workoutComplete = () => {
+        clearInterval(state.timer);
+        state.status = 'idle';
+        state.phase = 'complete';
+        playSound(state.sounds.workoutComplete);
+        elements.timerDisplayContent.classList.add('hidden');
+        elements.completionMessage.classList.remove('hidden');
+        updateButtonState();
+        setTimeout(() => reset(true), 5000);
+    };
+
+    const start = () => {
+        if (state.status === 'running') return;
+        
+        if (state.status === 'idle' || state.phase === 'complete') {
+            reset(false); // Soft reset without full UI update
+            state.phase = 'prepare';
+            state.currentTime = state.settings.preStartDelay;
+            if(state.settings.preStartDelay > 0) playSound(state.sounds.preStart);
+        }
+
+        state.status = 'running';
+        if (state.currentTime > 0) {
+            state.timer = setInterval(tick, 1000);
+        } else {
+            tick(); // Immediately advance to the next state if current time is 0
+            state.timer = setInterval(tick, 1000);
+        }
+        updateButtonState();
+        updateDisplay();
+    };
+
+    const pause = () => {
+        if (state.status !== 'running') return;
+        clearInterval(state.timer);
+        state.status = 'paused';
+        updateButtonState();
+    };
+
+    const reset = (fullReset = true) => {
+        clearInterval(state.timer);
+        state.status = 'idle';
+        state.phase = 'prepare';
+        state.currentRound = 0;
+        state.currentSet = 0;
+        state.currentTime = state.settings.preStartDelay;
+        if (fullReset) {
+            elements.timerDisplayContent.classList.remove('hidden');
+            elements.completionMessage.classList.add('hidden');
+            updateButtonState();
+            updateDisplay();
+        }
+    };
+
+    // --- UI UPDATE FUNCTIONS ---
+    const updateDurations = () => {
+        const s = state.settings;
+        const work = s.workTime || 0;
+        const rest = s.restTime || 0;
+        const rounds = s.roundsPerSet || 0;
+        const sets = s.numSets || 0;
+        const setRest = s.restBetweenSets || 0;
+
+        const setDuration = (work * rounds) + (rest * (rounds > 1 ? rounds - 1 : 0));
+        const totalDuration = (setDuration * sets) + (setRest * (sets > 1 ? sets - 1 : 0));
+
+        elements.setDurationDisplay.textContent = formatTime(setDuration);
+        elements.totalDurationDisplay.textContent = formatTime(totalDuration);
+    };
+
+    const updateDisplay = () => {
+        elements.timerDisplay.textContent = formatTime(state.currentTime);
+        elements.phaseDisplay.textContent = state.phase.replace('setRest', 'SET REST');
+        elements.currentRoundDisplay.textContent = state.currentRound;
+        elements.totalRoundsDisplay.textContent = state.settings.roundsPerSet;
+        elements.currentSetDisplay.textContent = state.currentSet;
+        elements.totalSetsDisplay.textContent = state.settings.numSets;
+
+        const exerciseText = (state.currentSet > 0 && state.settings.exercises[state.currentSet - 1]) ? state.settings.exercises[state.currentSet - 1] : '---';
+        elements.exerciseDisplay.textContent = exerciseText;
+
+        const phaseColors = {
+            prepare: 'text-yellow-400', work: 'text-green-400',
+            rest: 'text-purple-400', setRest: 'text-blue-400', complete: 'text-white'
+        };
+        elements.timerDisplay.className = `text-8xl md:text-9xl timer-display ${phaseColors[state.phase] || 'text-white'}`;
+        elements.phaseDisplay.className = `text-2xl font-bold uppercase mb-2 ${phaseColors[state.phase] || 'text-white'}`;
+    };
+    
+    const updateButtonState = () => {
+        if (state.status === 'running') {
+            elements.controlsContainer.className = 'flex justify-center';
+            elements.resetBtn.classList.add('hidden');
+            elements.settingsBtn.classList.add('hidden');
+            elements.startPauseBtn.textContent = 'Pause';
+            elements.startPauseBtn.className = 'bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg text-lg btn';
+        } else if (state.status === 'paused') {
+            elements.controlsContainer.className = 'grid grid-cols-3 gap-4';
+            elements.resetBtn.classList.remove('hidden');
+            elements.settingsBtn.classList.remove('hidden');
+            elements.startPauseBtn.textContent = 'Resume';
+            elements.startPauseBtn.className = 'bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg text-lg btn';
+        } else { // idle or complete
+            elements.controlsContainer.className = 'grid grid-cols-3 gap-4';
+            elements.resetBtn.classList.remove('hidden');
+            elements.settingsBtn.classList.remove('hidden');
+            elements.startPauseBtn.textContent = 'Start';
+            elements.startPauseBtn.className = 'bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg text-lg btn';
+        }
+    };
+
+    const updateUIFromState = () => {
+        generateTimerInputs();
+        generatePresetButtons();
+        generateExerciseInputs();
+        updateDurations();
+        reset();
+    };
+
+    // --- EVENT HANDLERS ---
+    const handleStartPause = () => { (state.status === 'running') ? pause() : start(); };
+    
+    const adjustExerciseArray = (newSize) => {
+        const currentExercises = state.settings.exercises;
+        if (!Array.isArray(currentExercises)) {
+            state.settings.exercises = [];
+        }
+        while (newSize > state.settings.exercises.length) {
+            state.settings.exercises.push('');
+        }
+        state.settings.exercises.length = newSize;
+    };
+
+    const handleSettingsChange = (e) => {
+        const oldNumSets = state.settings.numSets;
+        // Create a copy of the current exercises before updating settings
+        const currentExercises = [...state.settings.exercises];
+        
+        state.settings = {
+            workTime: parseInt(getElem('work-time').value, 10) || 0,
+            restTime: parseInt(getElem('rest-time').value, 10) || 0,
+            roundsPerSet: parseInt(getElem('rounds-per-set').value, 10) || 0,
+            numSets: parseInt(getElem('num-sets').value, 10) || 0,
+            restBetweenSets: parseInt(getElem('rest-between-sets').value, 10) || 0,
+            preStartDelay: state.settings.preStartDelay, // Keep existing
+            exercises: currentExercises // Start with the old list
+        };
+        
+        if (state.settings.numSets !== oldNumSets) {
+            adjustExerciseArray(state.settings.numSets);
+            generateExerciseInputs(); // Regenerate inputs based on new size
+        }
+
+        updateDurations();
+        if (state.status === 'idle') { reset(); }
+        saveState();
+    };
+    
+    const handleExerciseInputChange = (e) => {
+        const index = parseInt(e.target.dataset.setIndex, 10);
+        state.settings.exercises[index] = e.target.value;
+        saveState();
+    };
+
+    const applyPreset = (presetName) => {
+        const presetSettings = state.presets[presetName];
+        if (!presetSettings) return;
+
+        // Create a clean settings object from the preset, taking only what we need.
+        const cleanPresetSettings = {
+            workTime: presetSettings.workTime,
+            restTime: presetSettings.restTime,
+            roundsPerSet: presetSettings.roundsPerSet,
+            numSets: presetSettings.numSets,
+            restBetweenSets: presetSettings.restBetweenSets,
+            exercises: presetSettings.exercises || [] // Handle old presets without exercises
+        };
+
+        // Now merge the clean preset into the current settings.
+        state.settings = { ...state.settings, ...cleanPresetSettings };
+
+        updateUIFromState();
+        saveState();
+    };
+
+    const savePreset = (presetName) => {
+        // Create a clean object with only the properties that belong in a preset.
+        const { workTime, restTime, roundsPerSet, numSets, restBetweenSets, exercises } = state.settings;
+        const presetToSave = { workTime, restTime, roundsPerSet, numSets, restBetweenSets, exercises };
+
+        // Save the clean object.
+        state.presets[presetName] = JSON.parse(JSON.stringify(presetToSave));
+        
+        saveState();
+        togglePresetSaveMode(false);
+        generatePresetButtons(); // Regenerate to remove saving class
+    };
+
+    const togglePresetSaveMode = (isSaving) => {
+        isSavingPreset = isSaving;
+        elements.presetButtonsContainer.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.classList.toggle('saving', isSaving);
+        });
+        elements.presetHeading.textContent = isSaving ? "Select Slot to Overwrite" : "Presets";
+        elements.savePresetModeBtn.textContent = isSaving ? "Cancel" : "Save as Preset";
+    };
+
+    const showPanel = (panelToShow) => {
+        [elements.timerContainer, elements.settingsPanel, elements.exerciseSettingsPanel].forEach(panel => {
+            panel.classList.toggle('hidden', panel !== panelToShow);
+        });
+    };
+    
+    const handleStepper = (event) => {
+        const button = event.target.closest('[data-action]');
+        if (!button) return;
+        const input = getElem(button.dataset.target);
+        if (!input) return;
+
+        let value = parseInt(input.value, 10);
+        // Set a universal minimum of 0, as rest times can be 0.
+        const min = 0;
+        value = button.dataset.action === 'increment' ? value + 1 : value - 1;
+        input.value = Math.max(min, value);
+        // Dispatch 'input' event for real-time updates
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    
+    // --- EVENT LISTENERS BINDING---
+    const addEventListeners = () => {
+        elements.startPauseBtn.addEventListener('click', handleStartPause);
+        elements.resetBtn.addEventListener('click', () => reset(true));
+        elements.settingsBtn.addEventListener('click', () => showPanel(elements.settingsPanel));
+        elements.closeSettingsBtn.addEventListener('click', () => showPanel(elements.timerContainer));
+        elements.exerciseSettingsBtn.addEventListener('click', () => showPanel(elements.exerciseSettingsPanel));
+        elements.backToSettingsBtnFromExercises.addEventListener('click', () => showPanel(elements.settingsPanel));
+        elements.savePresetModeBtn.addEventListener('click', () => togglePresetSaveMode(!isSavingPreset));
+
+        // Use event delegation for dynamically created elements
+        elements.timerInputsContainer.addEventListener('click', e => {
+            if (e.target.matches('.stepper-btn')) handleStepper(e);
+        });
+        // Listen for 'input' for real-time updates
+        elements.timerInputsContainer.addEventListener('input', e => {
+            if (e.target.matches('.timer-setting-input')) handleSettingsChange(e);
+        });
+        elements.exerciseInputsContainer.addEventListener('input', e => {
+            if (e.target.matches('.exercise-input')) handleExerciseInputChange(e);
+        });
+    };
+
+    // --- INITIALIZATION ---
+    loadState();
+    updateUIFromState();
+    addEventListeners();
+    showPanel(elements.timerContainer); // Start on the timer screen
+});
+</script>
+</body>
+</html>
